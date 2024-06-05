@@ -109,7 +109,7 @@ jobs:
         env:
           IMAGE_TAG: ${{ env.tag }}
         run: |
-          DCF = docker-compose-$IMAGE_TAG.yml
+          DCF="docker-compose-$IMAGE_TAG.yml"
           touch $DCF
           echo "version: '2.4'" >> $DCF
           echo "services:" >> $DCF
