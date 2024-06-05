@@ -70,16 +70,16 @@ jobs:
       #     aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
       #     aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
       #     aws-region: ap-south-1
-      # - name: Login to Amazon ECR
-      #   id: login-ecr
-      #   uses: aws-actions/amazon-ecr-login@v1
-      # - name: Extract repository name
-      #   id: repo-name
-      #   run: |
-      #     REPO_NAME="${GITHUB_REPOSITORY##*/}"
-      #     echo "REPO_NAME=$REPO_NAME" >> $GITHUB_ENV
-      #     # echo "::set-output name=repo_name::$REPO_NAME"
-      #     echo "GitHub Repository = $REPO_NAME"
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v1
+      - name: Extract repository name
+        id: repo-name
+        run: |
+          REPO_NAME="${GITHUB_REPOSITORY##*/}"
+          echo "REPO_NAME=$REPO_NAME" >> $GITHUB_ENV
+          # echo "::set-output name=repo_name::$REPO_NAME"
+          echo "GitHub Repository = $REPO_NAME"
       # - name: Build Docker image
       #   env:
       #     ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
@@ -107,15 +107,18 @@ jobs:
       - name: Create Docker Compose File
         id: docker_compose_file_create
         env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          ECR_REPOSITORY: ${{ env.REPO_NAME }}
           IMAGE_TAG: ${{ env.tag }}
         run: |
           DCF="docker-compose-$IMAGE_TAG.yml"
+          echo "DockerComposeFile=$DCF" >> $GITHUB_ENV
           touch $DCF
           echo "version: '2.4'" >> $DCF
           echo "services:" >> $DCF
           echo " counter-service:" >> $DCF
           echo "   container_name: devops_gitactions-service" >> $DCF
-          echo "   image: 792232283901.dkr.ecr.ap-south-1.amazonaws.com/devops_gitactions:latest" >> $DCF
+          echo "   image: $ECR_REGISTRY/$ECR_REPOSITORY:latest" >> $DCF
           echo "    volumes:" >> $DCF
           echo "      - ./data:/data" >> $DCF
           echo "    ports:" >> $DCF
@@ -124,36 +127,36 @@ jobs:
           echo "    mem_limit: 256M" >> $DCF
           echo "    cpus: 0.5" >> $DCF
           cat $DCF
-      # - name: Deploy to EC2
-      #   env:
-      #     AWS_REGION: ${{ secrets.AWS_REGION}}
-      #     EC2_PEM_KEY: ${{ secrets.EC2_PEM_KEY }}
-      #     EC2_HOST: ${{ secrets.EC2_HOST }}
-      #     EC2_USER: ${{ secrets.EC2_USER }}
-      #     ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-      #     ECR_REPOSITORY: ${{ env.REPO_NAME }}
-      #     IMAGE_TAG: ${{ env.tag }}
-      #   run: |
-      #     DCF = docker-compose-$IMAGE_TAG.yml
-      #     # Save PEM key to file and set permissions
-      #     echo "$EC2_PEM_KEY" > ec2.pem
-      #     chmod 400 ec2.pem
+      - name: Deploy to EC2
+        env:
+          AWS_REGION: ${{ secrets.AWS_REGION}}
+          EC2_PEM_KEY: ${{ secrets.EC2_PEM_KEY }}
+          EC2_HOST: ${{ secrets.EC2_HOST }}
+          EC2_USER: ${{ secrets.EC2_USER }}
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          ECR_REPOSITORY: ${{ env.REPO_NAME }}
+          IMAGE_TAG: ${{ env.tag }}
+          DCF: ${{ env.DockerComposeFile }}
+        run: |
+          # Save PEM key to file and set permissions
+          echo "$EC2_PEM_KEY" > ec2.pem
+          chmod 400 ec2.pem
   
-      #     # SSH, SCP commands
-      #     SSH_COMMAND="ssh -i ec2.pem -o StrictHostKeyChecking=no $EC2_USER@$EC2_HOST"
-      #     SCP_COMMAND="scp -i ec2.pem -o StrictHostKeyChecking=no"
+          # SSH, SCP commands
+          SSH_COMMAND="ssh -i ec2.pem -o StrictHostKeyChecking=no $EC2_USER@$EC2_HOST"
+          SCP_COMMAND="scp -i ec2.pem -o StrictHostKeyChecking=no"
   
-      #     #Login to the Docker Registry (ECR)
-      #     $SSH_COMMAND "aws ecr get-login-password --region $AWS_REGION | sudo docker login --username AWS --password-stdin $ECR_REGISTRY"
+          #Login to the Docker Registry (ECR)
+          $SSH_COMMAND "aws ecr get-login-password --region $AWS_REGION | sudo docker login --username AWS --password-stdin $ECR_REGISTRY"
           
-      #     # Copy docker-compose.yml to EC2 server
-      #     # $SCP_COMMAND docker-compose.yml $EC2_USER@$EC2_HOST:/home/$EC2_USER/docker/
-      #     $SCP_COMMAND $DCF $EC2_USER@$EC2_HOST:/home/$EC2_USER/docker/
+          # Copy docker-compose.yml to EC2 server
+          # $SCP_COMMAND docker-compose.yml $EC2_USER@$EC2_HOST:/home/$EC2_USER/docker/
+          $SCP_COMMAND $DCF $EC2_USER@$EC2_HOST:/home/$EC2_USER/docker/
           
-      #     # Pull and run the Docker container on EC2
-      #     $SSH_COMMAND "cd /home/$EC2_USER/docker/ && sudo docker pull $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG && sudo docker compose -f $DCF up -d --force-recreate"
+          # Pull and run the Docker container on EC2
+          $SSH_COMMAND "cd /home/$EC2_USER/docker/ && sudo docker pull $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG && sudo docker compose -f $DCF up -d --force-recreate"
           
-      #     # Cleanup PEM key
-      #     rm -f ec2.pem
-      #     # Cleanup Docker Compose file
-      #     # rm -f $DCF
+          # Cleanup PEM key
+          rm -f ec2.pem
+          # Cleanup Docker Compose file
+          # rm -f $DCF
