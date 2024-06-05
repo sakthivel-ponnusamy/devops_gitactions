@@ -84,13 +84,10 @@ jobs:
       #   env:
       #     ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
       #     ECR_REPOSITORY: ${{ env.REPO_NAME }}
-      #     # IMAGE_TAG: ${{ steps.next_version.outputs.tag }}
       #     IMAGE_TAG: ${{ env.tag }}
       #   run: |
-      #     echo "$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
       #     docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
       #     echo "IMAGE_NAME=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" >> $GITHUB_ENV
-      #     echo "ECR Image Name = $IMAGE_NAME"
       # - name: Push Docker image to Amazon ECR
       #   env:
       #     ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
@@ -113,54 +110,70 @@ jobs:
         run: |
           DCF="docker-compose-$IMAGE_TAG.yml"
           echo "DockerComposeFile=$DCF" >> $GITHUB_ENV
-          touch $DCF
-          echo "version: '2.4'" >> $DCF
-          echo "services:" >> $DCF
-          echo " counter-service:" >> $DCF
-          echo "   container_name: devops_gitactions-service" >> $DCF
-          echo "   image: $ECR_REGISTRY/$ECR_REPOSITORY:latest" >> $DCF
-          echo "    volumes:" >> $DCF
-          echo "      - ./data:/data" >> $DCF
-          echo "    ports:" >> $DCF
-          echo "      - '80:8080'" >> $DCF
-          echo "    restart: always" >> $DCF
-          echo "    mem_limit: 256M" >> $DCF
-          echo "    cpus: 0.5" >> $DCF
+          cat <<EOF | tee $DCF
+          version: '2.4'
+          services:
+           counter-service:
+             container_name: devops_gitactions-service
+             image: $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+              volumes:
+                - ./data:/data
+              ports:
+                - '80:8080'
+              restart: always
+              mem_limit: 256M
+              cpus: 0.5
+          EOF
           cat $DCF
-      - name: Deploy to EC2
-        env:
-          AWS_REGION: ${{ secrets.AWS_REGION}}
-          EC2_PEM_KEY: ${{ secrets.EC2_PEM_KEY }}
-          EC2_HOST: ${{ secrets.EC2_HOST }}
-          EC2_USER: ${{ secrets.EC2_USER }}
-          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          ECR_REPOSITORY: ${{ env.REPO_NAME }}
-          IMAGE_TAG: ${{ env.tag }}
-          DCF: ${{ env.DockerComposeFile }}
-        run: |
-          # Save PEM key to file and set permissions
-          echo "$EC2_PEM_KEY" > ec2.pem
-          chmod 400 ec2.pem
+          
+          # touch $DCF
+          # echo "version: '2.4'" >> $DCF
+          # echo "services:" >> $DCF
+          # echo " counter-service:" >> $DCF
+          # echo "   container_name: devops_gitactions-service" >> $DCF
+          # echo "   image: $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" >> $DCF
+          # echo "    volumes:" >> $DCF
+          # echo "      - ./data:/data" >> $DCF
+          # echo "    ports:" >> $DCF
+          # echo "      - '80:8080'" >> $DCF
+          # echo "    restart: always" >> $DCF
+          # echo "    mem_limit: 256M" >> $DCF
+          # echo "    cpus: 0.5" >> $DCF
+          # cat $DCF
+      # - name: Deploy to EC2
+      #   env:
+      #     AWS_REGION: ${{ secrets.AWS_REGION}}
+      #     EC2_PEM_KEY: ${{ secrets.EC2_PEM_KEY }}
+      #     EC2_HOST: ${{ secrets.EC2_HOST }}
+      #     EC2_USER: ${{ secrets.EC2_USER }}
+      #     ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+      #     ECR_REPOSITORY: ${{ env.REPO_NAME }}
+      #     IMAGE_TAG: ${{ env.tag }}
+      #     DCF: ${{ env.DockerComposeFile }}
+      #   run: |
+      #     # Save PEM key to file and set permissions
+      #     echo "$EC2_PEM_KEY" > ec2.pem
+      #     chmod 400 ec2.pem
   
-          # SSH, SCP commands
-          SSH_COMMAND="ssh -i ec2.pem -o StrictHostKeyChecking=no $EC2_USER@$EC2_HOST"
-          SCP_COMMAND="scp -i ec2.pem -o StrictHostKeyChecking=no"
+      #     # SSH, SCP commands
+      #     SSH_COMMAND="ssh -i ec2.pem -o StrictHostKeyChecking=no $EC2_USER@$EC2_HOST"
+      #     SCP_COMMAND="scp -i ec2.pem -o StrictHostKeyChecking=no"
   
-          #Login to the Docker Registry (ECR)
-          $SSH_COMMAND "aws ecr get-login-password --region $AWS_REGION | sudo docker login --username AWS --password-stdin $ECR_REGISTRY"
+      #     #Login to the Docker Registry (ECR)
+      #     $SSH_COMMAND "aws ecr get-login-password --region $AWS_REGION | sudo docker login --username AWS --password-stdin $ECR_REGISTRY"
           
-          # Copy docker-compose.yml to EC2 server
-          # $SCP_COMMAND docker-compose.yml $EC2_USER@$EC2_HOST:/home/$EC2_USER/docker/
-          $SCP_COMMAND $DCF $EC2_USER@$EC2_HOST:/home/$EC2_USER/docker/
+      #     # Copy docker-compose.yml to EC2 server
+      #     # $SCP_COMMAND docker-compose.yml $EC2_USER@$EC2_HOST:/home/$EC2_USER/docker/
+      #     $SCP_COMMAND $DCF $EC2_USER@$EC2_HOST:/home/$EC2_USER/docker/
           
-          # Pull and run the Docker container on EC2 using Docker Compose
-          # $SSH_COMMAND "cd /home/$EC2_USER/docker/ && sudo docker pull $ECR_REGISTRY/$ECR_REPOSITORY:latest && sudo docker compose -f $DCF up -d --force-recreate"
+      #     # Pull and run the Docker container on EC2 using Docker Compose
+      #     # $SSH_COMMAND "cd /home/$EC2_USER/docker/ && sudo docker pull $ECR_REGISTRY/$ECR_REPOSITORY:latest && sudo docker compose -f $DCF up -d --force-recreate"
           
-          # If Docker Compose not in  EC2 then run below. Pull and run the Docker container on EC2 using Docker Run
-          $SSH_COMMAND "cd /home/$EC2_USER/docker/ && sudo docker pull $ECR_REGISTRY/$ECR_REPOSITORY:latest"
-          $SSH_COMMAND "sudo docker run -d --name devops_gitactions_service -v /home/$EC2_USER/docker/data:/data -p 80:8080 --memory 256M --cpus 0.5 --restart always $ECR_REGISTRY/$ECR_REPOSITORY:latest"
+      #     # If Docker Compose not in  EC2 then run below. Pull and run the Docker container on EC2 using Docker Run
+      #     $SSH_COMMAND "cd /home/$EC2_USER/docker/ && sudo docker pull $ECR_REGISTRY/$ECR_REPOSITORY:latest"
+      #     $SSH_COMMAND "sudo docker run -d --name devops_gitactions_service -v /home/$EC2_USER/docker/data:/data -p 80:8080 --memory 256M --cpus 0.5 --restart always $ECR_REGISTRY/$ECR_REPOSITORY:latest"
           
-          # Cleanup PEM key
-          rm -f ec2.pem
-          # Cleanup Docker Compose file
-          # rm -f $DCF
+      #     # Cleanup PEM key
+      #     rm -f ec2.pem
+      #     # Cleanup Docker Compose file
+      #     # rm -f $DCF
