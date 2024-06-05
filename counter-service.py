@@ -45,10 +45,10 @@ def handle_request():
         # Increment the counter for each POST request and update the file.
         counter += 1
         update_counter(counter)
-        return f"POST requests counter updated. Current count: {counter}"
+        return f"HEY, POST requests counter updated. Current count: {counter}"
     else:
         # For GET requests, just return the current count.
-        return f"Current POST requests count: {counter}"
+        return f"HEY, Current POST requests count: {counter}"
 
 @app.route('/health', methods=['GET'])
 def health_check():
