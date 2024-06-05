@@ -173,9 +173,14 @@ jobs:
           fi
           $SSH_COMMAND "sudo docker run -d --name $CON_NAME -v /home/$EC2_USER/docker/data:/data -p 80:8080 --memory 256M --cpus 0.5 --restart always $ECR_REGISTRY/$ECR_REPOSITORY:latest"
           # ******
+          
+          # Cleanup PEM key
+          rm -f ec2.pem
+          # Cleanup Docker Compose file
+          rm -f $DCF
 
-          #Delete the existing untagged Images
-          IMAGES_LIST= $($SSH_COMMAND sudo docker images $ECR_REGISTRY/$ECR_REPOSITORY:latest  --filter "dangling=true")
+          #Cleanup the existing untagged Images
+          IMAGES_LIST=$($SSH_COMMAND sudo docker images $ECR_REGISTRY/$ECR_REPOSITORY --filter "dangling=true" -q)
           if [ -n "$IMAGES_LIST" ]; then
             for im in $IMAGES_LIST
               do
@@ -183,7 +188,3 @@ jobs:
               done
           fi
           
-          # Cleanup PEM key
-          rm -f ec2.pem
-          # Cleanup Docker Compose file
-          rm -f $DCF
