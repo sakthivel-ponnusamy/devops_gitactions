@@ -154,7 +154,7 @@ jobs:
           $SCP_COMMAND $DCF $EC2_USER@$EC2_HOST:/home/$EC2_USER/docker/
           
           # Pull and run the Docker container on EC2
-          $SSH_COMMAND "cd /home/$EC2_USER/docker/ && sudo docker pull $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG && sudo docker compose -f $DCF up -d --force-recreate"
+          $SSH_COMMAND "cd /home/$EC2_USER/docker/ && sudo docker pull $ECR_REGISTRY/$ECR_REPOSITORY:latest && sudo docker compose -f $DCF up -d --force-recreate"
           
           # Cleanup PEM key
           rm -f ec2.pem
