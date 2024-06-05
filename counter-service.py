@@ -67,6 +67,7 @@ def health_check():
         # Return an unhealthy status if any error occurs, e.g., file access issues.
         return jsonify({"status": "unhealthy", "reason": str(e)}), 500
 
+abc = 100
 if __name__ == '__main__':
     # Run the Flask app with binding to all interfaces on port 8080.
     # Debug mode is turned off for production use.
