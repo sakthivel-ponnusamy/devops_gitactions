@@ -1,0 +1,12 @@
+version: '2.4'  # The last version of Docker Compose file format that directly supports mem_limit and cpus
+services:
+  counter-service:
+    container_name: devops_gitactions-service
+    image: 792232283901.dkr.ecr.ap-south-1.amazonaws.com/devops_gitactions:latest
+    volumes:
+      - ./data:/data
+    ports:
+      - "80:8080"
+    restart: always
+    mem_limit: 256M
+    cpus: 0.5
