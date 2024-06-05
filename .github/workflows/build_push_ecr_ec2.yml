@@ -158,7 +158,7 @@ jobs:
           
           # If Docker Compose not in  EC2 then run below. Pull and run the Docker container on EC2 using Docker Run
           $SSH_COMMAND "cd /home/$EC2_USER/docker/ && sudo docker pull $ECR_REGISTRY/$ECR_REPOSITORY:latest"
-          $SSH_COMMAND "sudo docker run -d --name devops_gitactions_service -v ./data:/data -p 80:8080 --memory 256M --cpus 0.5 --restart always $ECR_REGISTRY/$ECR_REPOSITORY:latest"
+          $SSH_COMMAND "sudo docker run -d --name devops_gitactions_service -v /home/$EC2_USER/docker/data:/data -p 80:8080 --memory 256M --cpus 0.5 --restart always $ECR_REGISTRY/$ECR_REPOSITORY:latest"
           
           # Cleanup PEM key
           rm -f ec2.pem
