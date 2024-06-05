@@ -174,6 +174,15 @@ jobs:
           $SSH_COMMAND "sudo docker run -d --name $CON_NAME -v /home/$EC2_USER/docker/data:/data -p 80:8080 --memory 256M --cpus 0.5 --restart always $ECR_REGISTRY/$ECR_REPOSITORY:latest"
           # ******
 
+          #Delete the existing untagged Images
+          IMAGES_LIST= $($SSH_COMMAND sudo docker images $ECR_REGISTRY/$ECR_REPOSITORY:latest  --filter "dangling=true")
+          if [ -n "$IMAGES_LIST" ]; then
+            for im in $IMAGES_LIST
+              do
+                $SSH_COMMAND sudo docker rmi -f $im
+              done
+          fi
+          
           # Cleanup PEM key
           rm -f ec2.pem
           # Cleanup Docker Compose file
