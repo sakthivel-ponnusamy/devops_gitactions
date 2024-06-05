@@ -163,14 +163,27 @@ jobs:
           # $SSH_COMMAND "cd /home/$EC2_USER/docker/ && sudo docker pull $ECR_REGISTRY/$ECR_REPOSITORY:latest && sudo docker compose -f $DCF up -d --force-recreate"
           
           # If Docker Compose not in  EC2 then run below. Pull and run the Docker container on EC2 using Docker Run
+          # *****
           $SSH_COMMAND "cd /home/$EC2_USER/docker/ && sudo docker pull $ECR_REGISTRY/$ECR_REPOSITORY:latest"
           TMP_CON_ID=$($SSH_COMMAND sudo docker ps -q -f name=$CON_NAME)
+          #Stop and remove the container if already running
           if [ -n "$TMP_CON_ID" ]; then
             $SSH_COMMAND sudo docker stop $TMP_CON_ID
+            $SSH_COMMAND sudo docker rm -f $TMP_CON_ID
           fi
           $SSH_COMMAND "sudo docker run -d --name $CON_NAME -v /home/$EC2_USER/docker/data:/data -p 80:8080 --memory 256M --cpus 0.5 --restart always $ECR_REGISTRY/$ECR_REPOSITORY:latest"
+          # ******
+          
+          #Cleanup the existing untagged Images
+          IMAGES_LIST=$($SSH_COMMAND sudo docker images $ECR_REGISTRY/$ECR_REPOSITORY --filter "dangling=true" -q)
+          if [ -n "$IMAGES_LIST" ]; then
+            for im in $IMAGES_LIST
+              do
+                $SSH_COMMAND sudo docker rmi -f $im
+              done
+          fi
           
           # Cleanup PEM key
           rm -f ec2.pem
           # Cleanup Docker Compose file
-          # rm -f $DCF
+          rm -f $DCF
