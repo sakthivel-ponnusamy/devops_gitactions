@@ -21,6 +21,12 @@ jobs:
     runs-on: ubuntu-latest
 
     # Steps represent a sequence of tasks that will be executed as part of the job
+    env:
+      AWS_REGION: ${{ secrets.AWS_REGION}}
+      EC2_PEM_KEY: ${{ secrets.EC2_PEM_KEY }}
+      EC2_HOST: ${{ secrets.EC2_HOST }}
+      EC2_USER: ${{ secrets.EC2_USER }}
+      CONTAINER_NAME: "devops_gitactions-service"
     steps:
       - name: Print Job Run URL
         id: print_job_run_id
@@ -69,7 +75,7 @@ jobs:
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ap-south-1
+          aws-region: ${{ env.AWS_REGION }}
       - name: Login to Amazon ECR
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v1
@@ -107,6 +113,7 @@ jobs:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
           ECR_REPOSITORY: ${{ env.REPO_NAME }}
           IMAGE_TAG: ${{ env.tag }}
+          CON_NAME: ${{ env.CONTAINER_NAME }}
         run: |
           DCF="docker-compose-$IMAGE_TAG.yml"
           echo "DockerComposeFile=$DCF" >> $GITHUB_ENV
@@ -116,7 +123,7 @@ jobs:
           version: '2.4'
           services:
            counter-service:
-             container_name: devops_gitactions-service
+             container_name: $CON_NAME
              image: $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
               volumes:
                 - ./data:/data
@@ -128,13 +135,14 @@ jobs:
           EOF
       - name: Deploy to EC2
         env:
-          AWS_REGION: ${{ secrets.AWS_REGION}}
-          EC2_PEM_KEY: ${{ secrets.EC2_PEM_KEY }}
-          EC2_HOST: ${{ secrets.EC2_HOST }}
-          EC2_USER: ${{ secrets.EC2_USER }}
+          # AWS_REGION: ${{ secrets.AWS_REGION}}
+          # EC2_PEM_KEY: ${{ secrets.EC2_PEM_KEY }}
+          # EC2_HOST: ${{ secrets.EC2_HOST }}
+          # EC2_USER: ${{ secrets.EC2_USER }}
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
           ECR_REPOSITORY: ${{ env.REPO_NAME }}
           DCF: ${{ env.DockerComposeFile }}
+          CON_NAME: ${{ env.CONTAINER_NAME }}
         run: |
           # Save PEM key to file and set permissions
           echo "$EC2_PEM_KEY" > ec2.pem
@@ -156,7 +164,11 @@ jobs:
           
           # If Docker Compose not in  EC2 then run below. Pull and run the Docker container on EC2 using Docker Run
           $SSH_COMMAND "cd /home/$EC2_USER/docker/ && sudo docker pull $ECR_REGISTRY/$ECR_REPOSITORY:latest"
-          $SSH_COMMAND "sudo docker run -d --name devops_gitactions_service -v /home/$EC2_USER/docker/data:/data -p 80:8080 --memory 256M --cpus 0.5 --restart always $ECR_REGISTRY/$ECR_REPOSITORY:latest"
+          TMP_CON_ID=$($SSH_COMMAND sudo docker ps -q -f name=$CON_NAME)
+          if [ -n "$TMP_CON_ID" ]; then
+            $SSH_COMMAND sudo docker stop $TMP_CON_ID
+          fi
+          $SSH_COMMAND "sudo docker run -d --name $CON_NAME -v /home/$EC2_USER/docker/data:/data -p 80:8080 --memory 256M --cpus 0.5 --restart always $ECR_REGISTRY/$ECR_REPOSITORY:latest"
           
           # Cleanup PEM key
           rm -f ec2.pem
