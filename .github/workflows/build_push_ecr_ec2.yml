@@ -20,12 +20,15 @@ jobs:
     # The type of runner that the job will run on
     runs-on: ubuntu-latest
 
+    # Mention the Environment
+    environment: development
+
     # Steps represent a sequence of tasks that will be executed as part of the job
     env:
       AWS_REGION: ${{ secrets.AWS_REGION}}
       EC2_PEM_KEY: ${{ secrets.EC2_PEM_KEY }}
-      EC2_HOST: ${{ secrets.EC2_HOST }}
-      EC2_USER: ${{ secrets.EC2_USER }}
+      EC2_HOST: ${{ vars.EC2_HOST }}
+      EC2_USER: ${{ vars.EC2_USER }}
       CONTAINER_NAME: "devops_gitactions-service"
     steps:
       - name: Print Job Run URL
@@ -56,174 +59,175 @@ jobs:
           git config --global user.name 'Sakthivel Ponnusamy'
           git config --global user.email 'shakthig@gmail.com'
 
-      # - name: Determine Next Version
-      #   id: next_version
-      #   run: |
-      #     # Fetch all tags
-      #     git fetch --tags
+      - name: Determine Next Version
+        id: next_version
+        run: |
+          # Fetch all tags
+          git fetch --tags
           
-      #     # Get the latest tag, assume semver, and sort.
-      #     LATEST_TAG=$(git tag -l | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -n1)
+          # Get the latest tag, assume semver, and sort.
+          LATEST_TAG=$(git tag -l | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -n1)
           
-      #     # If there's no tag yet, start with v0.0.0. Used for new repos
-      #     if [ -z "$LATEST_TAG" ]; then
-      #       LATEST_TAG="v0.0.0"
-      #     fi
+          # If there's no tag yet, start with v0.0.0. Used for new repos
+          if [ -z "$LATEST_TAG" ]; then
+            LATEST_TAG="v0.0.0"
+          fi
           
-      #     # Increment the patch version
-      #     NEXT_TAG=$(echo $LATEST_TAG | awk -F. '{print $1"."$2"."$3+1}')
+          # Increment the patch version
+          NEXT_TAG=$(echo $LATEST_TAG | awk -F. '{print $1"."$2"."$3+1}')
           
-      #     # Output the next version (GITHUB_ENV - is the environment variable file in Github actions)
-      #     echo "tag=$NEXT_TAG" >> $GITHUB_ENV
-      #     # echo "::set-output name=tag::$NEXT_TAG"
-      #     echo "Next version: $NEXT_TAG"
-      # - name: Create Release
-      #   id: create_release
-      #   uses: actions/create-release@v1
-      #   env:
-      #     GITHUB_TOKEN: ${{ secrets.ACCESS_TOKEN_2 }}
-      #   with:
-      #     tag_name: ${{ env.tag }}
-      #     release_name: Release ${{ env.tag }} 
-      #     # tag_name: ${{ steps.next_version.outputs.tag }}
-      #     # release_name: Release ${{ steps.next_version.outputs.tag }}
-      #     draft: false
-      #     prerelease: false
-      # - name: Configure AWS credentials
-      #   uses: aws-actions/configure-aws-credentials@v1
-      #   with:
-      #     aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-      #     aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-      #     aws-region: ${{ env.AWS_REGION }}
-      # - name: Login to Amazon ECR
-      #   id: login-ecr
-      #   uses: aws-actions/amazon-ecr-login@v1
-      # - name: Extract repository name
-      #   id: repo-name
-      #   run: |
-      #     REPO_NAME="${GITHUB_REPOSITORY##*/}"
-      #     echo "REPO_NAME=$REPO_NAME" >> $GITHUB_ENV
-      #     # echo "::set-output name=repo_name::$REPO_NAME"
-      #     echo "GitHub Repository = $REPO_NAME"
-      # - name: Build Docker image
-      #   env:
-      #     ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-      #     ECR_REPOSITORY: ${{ env.REPO_NAME }}
-      #     IMAGE_TAG: ${{ env.tag }}
-      #   run: |
-      #     docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
-      #     echo "IMAGE_NAME=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" >> $GITHUB_ENV
-      # - name: Push Docker image to Amazon ECR
-      #   env:
-      #     ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-      #     ECR_REPOSITORY: ${{ env.REPO_NAME }}
-      #     # IMAGE_TAG: ${{ steps.next_version.outputs.tag }}
-      #     IMAGE_TAG: ${{ env.tag }}
-      #   run: |
-      #     # Tag the image as latest
-      #     docker tag $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG $ECR_REGISTRY/$ECR_REPOSITORY:latest
-      #     # Push the specific version tag
-      #     docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
-      #     # Push the latest tag
-      #     docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
-      # - name: Create Docker Compose File
-      #   id: docker_compose_file_create
-      #   env:
-      #     ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-      #     ECR_REPOSITORY: ${{ env.REPO_NAME }}
-      #     IMAGE_TAG: ${{ env.tag }}
-      #     CON_NAME: ${{ env.CONTAINER_NAME }}
-      #   run: |
-      #     DCF="docker-compose-$IMAGE_TAG.yml"
-      #     echo "DockerComposeFile=$DCF" >> $GITHUB_ENV
+          # Output the next version (GITHUB_ENV - is the environment variable file in Github actions)
+          echo "tag=$NEXT_TAG" >> $GITHUB_ENV
+          # echo "::set-output name=tag::$NEXT_TAG"
+          echo "Next version: $NEXT_TAG"
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.ACCESS_TOKEN_2 }}
+        with:
+          tag_name: ${{ env.tag }}
+          release_name: Release ${{ env.tag }} 
+          # tag_name: ${{ steps.next_version.outputs.tag }}
+          # release_name: Release ${{ steps.next_version.outputs.tag }}
+          draft: false
+          prerelease: false
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v1
+      - name: Extract repository name
+        id: repo-name
+        run: |
+          REPO_NAME="${GITHUB_REPOSITORY##*/}"
+          echo "REPO_NAME=$REPO_NAME" >> $GITHUB_ENV
+          # echo "::set-output name=repo_name::$REPO_NAME"
+          echo "GitHub Repository = $REPO_NAME"
+      - name: Build Docker image
+        if: ${{ vars.DO_BUILD_DOCKER_IMAGE == 1 }}
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          ECR_REPOSITORY: ${{ env.REPO_NAME }}
+          IMAGE_TAG: ${{ env.tag }}
+        run: |
+          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
+          echo "IMAGE_NAME=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" >> $GITHUB_ENV
+      
+      - name: Push Docker image to Amazon ECR
+        if: ${{ vars.DO_BUILD_DOCKER_IMAGE == 1 }}  
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          ECR_REPOSITORY: ${{ env.REPO_NAME }}
+          # IMAGE_TAG: ${{ steps.next_version.outputs.tag }}
+          IMAGE_TAG: ${{ env.tag }}
+        run: |
+          # Tag the image as latest
+          docker tag $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG $ECR_REGISTRY/$ECR_REPOSITORY:latest
+          # Push the specific version tag
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+          # Push the latest tag
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
+      - name: Create Docker Compose File
+        id: docker_compose_file_create
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          ECR_REPOSITORY: ${{ env.REPO_NAME }}
+          IMAGE_TAG: ${{ env.tag }}
+          CON_NAME: ${{ env.CONTAINER_NAME }}
+        run: |
+          DCF="docker-compose-$IMAGE_TAG.yml"
+          echo "DockerComposeFile=$DCF" >> $GITHUB_ENV
           
-      #     #Create the content for Docker Compose file
-      #     cat <<EOF | tee $DCF
-      #     version: '2.4'
-      #     services:
-      #      counter-service:
-      #        container_name: $CON_NAME
-      #        image: $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
-      #         volumes:
-      #           - ./data:/data
-      #         ports:
-      #           - '80:8080'
-      #         restart: always
-      #         mem_limit: 256M
-      #         cpus: 0.5
-      #     EOF
-      # ###########################################################
-      # ###  Docker image Snyk scan | If fails, drop the action ###
-      # ###       Connected to my personal Snyk account         ###
-      # ###     The code owner receives an email notification   ###
-      # ### Possible to configure Slack notification if needed  ###
-      # ###########################################################               
+          #Create the content for Docker Compose file
+          cat <<EOF | tee $DCF
+          version: '2.4'
+          services:
+           counter-service:
+             container_name: $CON_NAME
+             image: $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+              volumes:
+                - ./data:/data
+              ports:
+                - '80:8080'
+              restart: always
+              mem_limit: 256M
+              cpus: 0.5
+          EOF
+      ###########################################################
+      ###  Docker image Snyk scan | If fails, drop the action ###
+      ###       Connected to my personal Snyk account         ###
+      ###     The code owner receives an email notification   ###
+      ### Possible to configure Slack notification if needed  ###
+      ###########################################################               
                     
-      # - name: Run Snyk to check Docker image for vulnerabilities
-      #   uses: snyk/actions/docker@master
-      #   env:
-      #     SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
-      #   with:
-      #     image: ${{ env.IMAGE_NAME }}
-      #     args: --severity-threshold=high --policy-path=.snyk
-      #   continue-on-error: false
+      - name: Run Snyk to check Docker image for vulnerabilities
+        if: ${{ vars.DO_BUILD_DOCKER_IMAGE == 1 }}
+        uses: snyk/actions/docker@master
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        with:
+          image: ${{ env.IMAGE_NAME }}
+          args: --severity-threshold=high --policy-path=.snyk
+        continue-on-error: false
 
-      # ###########################################################
-      # ###         PUSH IMAGE TO ECR AND DEPLOY TO EC2         ###
-      # ###     Tag Docker image as "latest" and push to ECR    ###
-      # ###               Deploy to EC2 using SSH               ###
-      # ########################################################### 
-      # - name: Deploy to EC2
-      #   env:
-      #     # AWS_REGION: ${{ secrets.AWS_REGION}}
-      #     # EC2_PEM_KEY: ${{ secrets.EC2_PEM_KEY }}
-      #     # EC2_HOST: ${{ secrets.EC2_HOST }}
-      #     # EC2_USER: ${{ secrets.EC2_USER }}
-      #     ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-      #     ECR_REPOSITORY: ${{ env.REPO_NAME }}
-      #     DCF: ${{ env.DockerComposeFile }}
-      #     CON_NAME: ${{ env.CONTAINER_NAME }}
-      #   run: |
-      #     # Save PEM key to file and set permissions
-      #     echo "$EC2_PEM_KEY" > ec2.pem
-      #     chmod 400 ec2.pem
+      ###########################################################
+      ###         PUSH IMAGE TO ECR AND DEPLOY TO EC2         ###
+      ###     Tag Docker image as "latest" and push to ECR    ###
+      ###               Deploy to EC2 using SSH               ###
+      ########################################################### 
+      - name: Deploy to EC2
+        if: ${{ vars.DO_DEPLOY_TO_EC2 == 1 }}
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          ECR_REPOSITORY: ${{ env.REPO_NAME }}
+          DCF: ${{ env.DockerComposeFile }}
+          CON_NAME: ${{ env.CONTAINER_NAME }}
+        run: |
+          # Save PEM key to file and set permissions
+          echo "$EC2_PEM_KEY" > ec2.pem
+          chmod 400 ec2.pem
   
-      #     # SSH, SCP commands
-      #     SSH_COMMAND="ssh -i ec2.pem -o StrictHostKeyChecking=no $EC2_USER@$EC2_HOST"
-      #     SCP_COMMAND="scp -i ec2.pem -o StrictHostKeyChecking=no"
+          # SSH, SCP commands
+          SSH_COMMAND="ssh -i ec2.pem -o StrictHostKeyChecking=no $EC2_USER@$EC2_HOST"
+          SCP_COMMAND="scp -i ec2.pem -o StrictHostKeyChecking=no"
   
-      #     #Login to the Docker Registry (ECR)
-      #     $SSH_COMMAND "aws ecr get-login-password --region $AWS_REGION | sudo docker login --username AWS --password-stdin $ECR_REGISTRY"
+          #Login to the Docker Registry (ECR)
+          $SSH_COMMAND "aws ecr get-login-password --region $AWS_REGION | sudo docker login --username AWS --password-stdin $ECR_REGISTRY"
           
-      #     # Copy docker-compose.yml to EC2 server
-      #     # $SCP_COMMAND docker-compose.yml $EC2_USER@$EC2_HOST:/home/$EC2_USER/docker/
-      #     $SCP_COMMAND $DCF $EC2_USER@$EC2_HOST:/home/$EC2_USER/docker/
+          # Copy docker-compose.yml to EC2 server
+          # $SCP_COMMAND docker-compose.yml $EC2_USER@$EC2_HOST:/home/$EC2_USER/docker/
+          $SCP_COMMAND $DCF $EC2_USER@$EC2_HOST:/home/$EC2_USER/docker/
           
-      #     # Pull and run the Docker container on EC2 using Docker Compose
-      #     # $SSH_COMMAND "cd /home/$EC2_USER/docker/ && sudo docker pull $ECR_REGISTRY/$ECR_REPOSITORY:latest && sudo docker compose -f $DCF up -d --force-recreate"
+          # Pull and run the Docker container on EC2 using Docker Compose
+          # $SSH_COMMAND "cd /home/$EC2_USER/docker/ && sudo docker pull $ECR_REGISTRY/$ECR_REPOSITORY:latest && sudo docker compose -f $DCF up -d --force-recreate"
           
-      #     # If Docker Compose not in  EC2 then run below. Pull and run the Docker container on EC2 using Docker Run
-      #     # *****
-      #     $SSH_COMMAND "cd /home/$EC2_USER/docker/ && sudo docker pull $ECR_REGISTRY/$ECR_REPOSITORY:latest"
-      #     TMP_CON_ID=$($SSH_COMMAND sudo docker ps -q -f name=$CON_NAME)
-      #     #Stop and remove the container if already running
-      #     if [ -n "$TMP_CON_ID" ]; then
-      #       $SSH_COMMAND sudo docker stop $TMP_CON_ID
-      #       $SSH_COMMAND sudo docker rm -f $TMP_CON_ID
-      #     fi
-      #     $SSH_COMMAND "sudo docker run -d --name $CON_NAME -v /home/$EC2_USER/docker/data:/data -p 80:8080 --memory 256M --cpus 0.5 --restart always $ECR_REGISTRY/$ECR_REPOSITORY:latest"
-      #     # ******
+          # If Docker Compose not in  EC2 then run below. Pull and run the Docker container on EC2 using Docker Run
+          # *****
+          $SSH_COMMAND "cd /home/$EC2_USER/docker/ && sudo docker pull $ECR_REGISTRY/$ECR_REPOSITORY:latest"
+          TMP_CON_ID=$($SSH_COMMAND sudo docker ps -q -f name=$CON_NAME)
+          #Stop and remove the container if already running
+          if [ -n "$TMP_CON_ID" ]; then
+            $SSH_COMMAND sudo docker stop $TMP_CON_ID
+            $SSH_COMMAND sudo docker rm -f $TMP_CON_ID
+          fi
+          $SSH_COMMAND "sudo docker run -d --name $CON_NAME -v /home/$EC2_USER/docker/data:/data -p 80:8080 --memory 256M --cpus 0.5 --restart always $ECR_REGISTRY/$ECR_REPOSITORY:latest"
+          # ******
           
-      #     #Cleanup the existing untagged Images
-      #     IMAGES_LIST=$($SSH_COMMAND sudo docker images $ECR_REGISTRY/$ECR_REPOSITORY --filter "dangling=true" -q)
-      #     if [ -n "$IMAGES_LIST" ]; then
-      #       for im in $IMAGES_LIST
-      #         do
-      #           $SSH_COMMAND sudo docker rmi -f $im
-      #         done
-      #     fi
+          #Cleanup the existing untagged Images
+          IMAGES_LIST=$($SSH_COMMAND sudo docker images $ECR_REGISTRY/$ECR_REPOSITORY --filter "dangling=true" -q)
+          if [ -n "$IMAGES_LIST" ]; then
+            for im in $IMAGES_LIST
+              do
+                $SSH_COMMAND sudo docker rmi -f $im
+              done
+          fi
           
-      #     # Cleanup PEM key
-      #     rm -f ec2.pem
-      #     # Cleanup Docker Compose file
-      #     rm -f $DCF
+          # Cleanup PEM key
+          rm -f ec2.pem
+          # Cleanup Docker Compose file
+          rm -f $DCF
