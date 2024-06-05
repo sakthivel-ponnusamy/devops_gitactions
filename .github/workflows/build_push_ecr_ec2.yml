@@ -19,7 +19,7 @@ jobs:
   build-and-push:
     # Mention the Environment
     # environment: development
-    
+
     # The type of runner that the job will run on
     runs-on: ubuntu-latest
 
@@ -117,7 +117,9 @@ jobs:
         run: |
           docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
           echo "IMAGE_NAME=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" >> $GITHUB_ENV
+      
       - name: Push Docker image to Amazon ECR
+        if: ${{ vars.DO_BUILD_DOCKER_IMAGE == 1 }}  
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
           ECR_REPOSITORY: ${{ env.REPO_NAME }}
@@ -164,6 +166,7 @@ jobs:
       ###########################################################               
                     
       - name: Run Snyk to check Docker image for vulnerabilities
+        if: ${{ vars.DO_BUILD_DOCKER_IMAGE == 1 }}
         uses: snyk/actions/docker@master
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
