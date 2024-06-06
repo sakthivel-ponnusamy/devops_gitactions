@@ -262,27 +262,27 @@ jobs:
           $SSH_COMMAND cd /home/$EC2_USER/docker/
 
           #Create the Namespace
-          ns=$(sudo kubectl get ns -l "kubernetes.io/metadata.name=devops-gitactions" -o=jsonpath="{.items[*].metadata.name}")
+          ns=$($SSH_COMMAND kubectl get ns -l "kubernetes.io/metadata.name=devops-gitactions" -o=jsonpath="{.items[*].metadata.name}")
           if [ -z "$ns" ]; then
             echo "Namespace Not Exists, hence creating"
-            sudo kubectl create ns devops-gitactions
+            $SSH_COMMAND kubectl create ns devops-gitactions
           else
             echo "Namespace AlreadyExists $ns"
           fi
 
           #Create the Secret for AWS ECR
-          awsEcrSec=$(kubectl get secret -n devops-gitactions -l "name=aws-ecr" -o=jsonpath="{.items[*].metadata.name}")
+          awsEcrSec=$($SSH_COMMAND kubectl get secret -n devops-gitactions -l "name=aws-ecr" -o=jsonpath="{.items[*].metadata.name}")
           if [ -z "$awsEcrSec" ]; then
             echo "Secret Not Exists, hence creating"
-            sudo kubectl create secret docker-registry aws-ecr -n devops-gitactions  --docker-server=792232283901.dkr.ecr.ap-south-1.amazonaws.com   --docker-username=AWS   --docker-password=$(aws ecr get-login-password)
-            sudo kubectl label secret aws-ecr -n devops-gitactions name=aws-ecr
+            $SSH_COMMAND kubectl create secret docker-registry aws-ecr -n devops-gitactions  --docker-server=792232283901.dkr.ecr.ap-south-1.amazonaws.com   --docker-username=AWS   --docker-password=$(aws ecr get-login-password)
+            $SSH_COMMAND kubectl label secret aws-ecr -n devops-gitactions name=aws-ecr
           else
             echo "Secret AlreadyExists $awsEcrSec"
           fi
 
           #Copy the Manifest file for Deploy & Service and apply
           $SCP_COMMAND ./k8s_yaml/devops_actions_k8s.yaml $EC2_USER@$K8S_EC2_HOST:/home/$EC2_USER/docker/
-          $SSH_COMMAND sudo kubectl apply -f devops_actions_k8s.yaml
+          $SSH_COMMAND kubectl apply -f devops_actions_k8s.yaml
 
           #Cleanup
           rm -f devops_actions_k8s.yaml
