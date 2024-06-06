@@ -7,9 +7,9 @@ on:
   # Triggers the workflow on push or pull request events but only for the "main" branch
   # push:
     # branches: [ "main" ]
-  pull_request:
-    branches: [ "main" ]
-    types: [closed]
+  # pull_request:
+  #   branches: [ "main" ]
+  #   types: [closed]
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
 
@@ -17,10 +17,10 @@ on:
 jobs:
   # This workflow contains a single job called "build"
   build-and-push:
-    if: ${{ github.event.pull_request.merged == true }}
+    # if: ${{ github.event.pull_request.merged == true }}
     # The type of runner that the job will run on
-    # runs-on: ubuntu-latest
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
+    # runs-on: self-hosted
     # Mention the Environment
     environment: development
 
@@ -29,6 +29,7 @@ jobs:
       AWS_REGION: ${{ secrets.AWS_REGION}}
       EC2_PEM_KEY: ${{ secrets.EC2_PEM_KEY }}
       EC2_HOST: ${{ vars.EC2_HOST }}
+      K8S_EC2_HOST: ${{ vars.K8S_EC2_HOST }}
       EC2_USER: ${{ vars.EC2_USER }}
       CONTAINER_NAME: "devops_gitactions-service"
     steps:
@@ -61,6 +62,7 @@ jobs:
           git config --global user.email 'shakthig@gmail.com'
 
       - name: Determine Next Version
+        if: ${{ vars.DO_BUILD_DOCKER_IMAGE == 1 }} 
         id: next_version
         run: |
           # Fetch all tags
@@ -82,6 +84,7 @@ jobs:
           # echo "::set-output name=tag::$NEXT_TAG"
           echo "Next version: $NEXT_TAG"
       - name: Create Release
+        if: ${{ vars.DO_BUILD_DOCKER_IMAGE == 1 }} 
         id: create_release
         uses: actions/create-release@v1
         env:
@@ -100,6 +103,7 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
       - name: Login to Amazon ECR
+        if: ${{ vars.DO_BUILD_DOCKER_IMAGE == 1 }} 
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v1
       - name: Extract repository name
@@ -133,7 +137,26 @@ jobs:
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
           # Push the latest tag
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
+      
+      ###########################################################
+      ###  Docker image Snyk scan | If fails, drop the action ###
+      ###       Connected to my personal Snyk account         ###
+      ###     The code owner receives an email notification   ###
+      ### Possible to configure Slack notification if needed  ###
+      ###########################################################               
+                    
+      - name: Run Snyk to check Docker image for vulnerabilities
+        if: ${{ vars.DO_BUILD_DOCKER_IMAGE == 1 }}
+        uses: snyk/actions/docker@master
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        with:
+          image: ${{ env.IMAGE_NAME }}
+          args: --severity-threshold=high --policy-path=.snyk
+        continue-on-error: false
+      
       - name: Create Docker Compose File
+        if: ${{ vars.DO_DEPLOY_TO_EC2 == 1 }}
         id: docker_compose_file_create
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
@@ -160,23 +183,6 @@ jobs:
               cpus: 0.5
           EOF
       ###########################################################
-      ###  Docker image Snyk scan | If fails, drop the action ###
-      ###       Connected to my personal Snyk account         ###
-      ###     The code owner receives an email notification   ###
-      ### Possible to configure Slack notification if needed  ###
-      ###########################################################               
-                    
-      - name: Run Snyk to check Docker image for vulnerabilities
-        if: ${{ vars.DO_BUILD_DOCKER_IMAGE == 1 }}
-        uses: snyk/actions/docker@master
-        env:
-          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
-        with:
-          image: ${{ env.IMAGE_NAME }}
-          args: --severity-threshold=high --policy-path=.snyk
-        continue-on-error: false
-
-      ###########################################################
       ###         PUSH IMAGE TO ECR AND DEPLOY TO EC2         ###
       ###     Tag Docker image as "latest" and push to ECR    ###
       ###               Deploy to EC2 using SSH               ###
@@ -196,7 +202,10 @@ jobs:
           # SSH, SCP commands
           SSH_COMMAND="ssh -i ec2.pem -o StrictHostKeyChecking=no $EC2_USER@$EC2_HOST"
           SCP_COMMAND="scp -i ec2.pem -o StrictHostKeyChecking=no"
-  
+          
+          #Create Directory for the temp files
+          $SSH_COMMAND mkdir -p /home/$EC2_USER/docker && cd /home/$EC2_USER/docker
+
           #Login to the Docker Registry (ECR)
           $SSH_COMMAND "aws ecr get-login-password --region $AWS_REGION | sudo docker login --username AWS --password-stdin $ECR_REGISTRY"
           
@@ -232,3 +241,47 @@ jobs:
           rm -f ec2.pem
           # Cleanup Docker Compose file
           rm -f $DCF
+      - name: Deploy to EC2
+        if: ${{ vars.DO_DEPLOY_TO_K8S == 1 }}
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          ECR_REPOSITORY: ${{ env.REPO_NAME }}
+          DCF: ${{ env.DockerComposeFile }}
+          CON_NAME: ${{ env.CONTAINER_NAME }}
+        run: |
+          # Save PEM key to file and set permissions
+          echo "$EC2_PEM_KEY" > ec2.pem
+          chmod 400 ec2.pem
+
+          # SSH, SCP commands
+          SSH_COMMAND="ssh -i ec2.pem -o StrictHostKeyChecking=no $EC2_USER@$K8S_EC2_HOST"
+          SCP_COMMAND="scp -i ec2.pem -o StrictHostKeyChecking=no"
+
+          #Create Directory for the temp files
+          $SSH_COMMAND mkdir -p /home/$EC2_USER/docker && cd /home/$EC2_USER/docker
+
+          #Create the Namespace
+          ns=$(sudo kubectl get ns -l "kubernetes.io/metadata.name=devops-gitactions" -o=jsonpath="{.items[*].metadata.name}")
+          if [ -z "$ns" ]; then
+            echo "Namespace Not Exists, hence creating"
+            sudo kubectl create ns devops-gitactions
+          else
+            echo "Namespace AlreadyExists $ns"
+          fi
+
+          #Create the Secret for AWS ECR
+          awsEcrSec=$(kubectl get secret -n devops-gitactions -l "name=aws-ecr" -o=jsonpath="{.items[*].metadata.name}")
+          if [ -z "$awsEcrSec" ]; then
+            echo "Secret Not Exists, hence creating"
+            sudo kubectl create secret docker-registry aws-ecr -n devops-gitactions  --docker-server=792232283901.dkr.ecr.ap-south-1.amazonaws.com   --docker-username=AWS   --docker-password=$(aws ecr get-login-password)
+            sudo kubectl label secret aws-ecr -n devops-gitactions name=aws-ecr
+          else
+            echo "Secret AlreadyExists $awsEcrSec"
+          fi
+
+          #Copy the Manifest file for Deploy & Service and apply
+          $SCP_COMMAND ./k8s_yaml/devops_actions_k8s.yaml $EC2_USER@$K8S_EC2_HOST:/home/$EC2_USER/docker/
+          $SSH_COMMAND sudo kubectl apply -f devops_actions_k8s.yaml
+
+          #Cleanup
+          rm -f devops_actions_k8s.yaml
