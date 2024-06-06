@@ -50,11 +50,11 @@ jobs:
       ###        Connected to my personal Sonar Cloud account      ###
       ################################################################
 
-      - name: SonarCloud Scan
-        uses: SonarSource/sonarcloud-github-action@v2.2.0
-        env:
-          GITHUB_TOKEN: ${{ secrets.ACCESS_TOKEN_2 }}
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+      # - name: SonarCloud Scan
+      #   uses: SonarSource/sonarcloud-github-action@v2.2.0
+      #   env:
+      #     GITHUB_TOKEN: ${{ secrets.ACCESS_TOKEN_2 }}
+      #     SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
 
       - name: Setup Git
         run: |
@@ -258,7 +258,8 @@ jobs:
           SCP_COMMAND="scp -i ec2.pem -o StrictHostKeyChecking=no"
 
           #Create Directory for the temp files
-          $SSH_COMMAND mkdir -p /home/$EC2_USER/docker && cd /home/$EC2_USER/docker/
+          $SSH_COMMAND mkdir -p /home/$EC2_USER/docker 
+          $SSH_COMMAND cd /home/$EC2_USER/docker/
 
           #Create the Namespace
           ns=$(sudo kubectl get ns -l "kubernetes.io/metadata.name=devops-gitactions" -o=jsonpath="{.items[*].metadata.name}")
