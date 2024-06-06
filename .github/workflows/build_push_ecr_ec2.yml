@@ -282,7 +282,8 @@ jobs:
 
           #Copy the Manifest file for Deploy & Service and apply
           $SCP_COMMAND ./k8s_yaml/devops_actions_k8s.yaml $EC2_USER@$K8S_EC2_HOST:/home/$EC2_USER/docker/
-          $SSH_COMMAND kubectl apply -f devops_actions_k8s.yaml
-
+          $SSH_COMMAND kubectl apply -f /home/$EC2_USER/docker/devops_actions_k8s.yaml
+          echo "PODs and Service Deployed"
+          
           #Cleanup
           rm -f devops_actions_k8s.yaml
