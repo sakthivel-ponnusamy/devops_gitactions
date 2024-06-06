@@ -241,7 +241,7 @@ jobs:
           rm -f ec2.pem
           # Cleanup Docker Compose file
           rm -f $DCF
-      - name: Deploy to EC2
+      - name: Deploy to K8S
         if: ${{ vars.DO_DEPLOY_TO_K8S == 1 }}
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
@@ -258,7 +258,7 @@ jobs:
           SCP_COMMAND="scp -i ec2.pem -o StrictHostKeyChecking=no"
 
           #Create Directory for the temp files
-          $SSH_COMMAND mkdir -p /home/$EC2_USER/docker && cd /home/$EC2_USER/docker
+          $SSH_COMMAND mkdir -p /home/$EC2_USER/docker && cd /home/$EC2_USER/docker/
 
           #Create the Namespace
           ns=$(sudo kubectl get ns -l "kubernetes.io/metadata.name=devops-gitactions" -o=jsonpath="{.items[*].metadata.name}")
