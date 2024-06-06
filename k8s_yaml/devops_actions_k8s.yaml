@@ -1,0 +1,57 @@
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: devops-gitactions-deploy
+  namespace: devops-gitactions
+spec:
+  replicas: 2
+  strategy: 
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 1
+  selector:
+    matchLabels:
+      app: devops-gitactions-app
+  template:
+    metadata:
+      labels:
+        app: devops-gitactions-app
+    spec:
+      containers:
+        - name: devops-gitactions-container
+          image: 792232283901.dkr.ecr.ap-south-1.amazonaws.com/devops_gitactions:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8080
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 5
+            timeoutSeconds: 3
+            periodSeconds: 10
+          volumeMounts:
+            - mountPath: /data
+              name: devops-gitactions-volume
+      imagePullSecrets:
+        - name: aws-ecr
+      volumes:
+        - name: devops-gitactions-volume
+          hostPath:
+            type: DirectoryOrCreate
+            path: /root/github-actions-volume
+---
+kind: Service
+apiVersion: v1
+metadata:
+  name: devops-gitactions-svc
+  namespace: devops-gitactions
+spec:
+  selector:
+    app: devops-gitactions-app
+  type: NodePort
+  ports:
+   - port: 8081
+     targetPort: 8080
+     nodePort: 32601
